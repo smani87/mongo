@@ -814,8 +814,11 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 	 * Clear the prepared round up flag if the transaction is not prepared.
 	 * There is no rounding up to do in that case.
 	 */
-	if (!prepare)
+	if (!prepare){
 		F_CLR(txn, WT_TXN_TS_ROUND_PREPARED);
+    } else {
+        printf("+++++ commiting a prepared txn %lu \n", txn->id); 
+    }
 
 	/* Look for a commit timestamp. */
 	WT_ERR(

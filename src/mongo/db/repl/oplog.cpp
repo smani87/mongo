@@ -1396,8 +1396,8 @@ Status applyOperation_inlock(OperationContext* opCtx,
                              bool alwaysUpsert,
                              OplogApplication::Mode mode,
                              IncrementOpsAppliedStatsFn incrementOpsAppliedStats) {
-    LOG(3) << "applying op: " << redact(op)
-           << ", oplog application mode: " << OplogApplication::modeToString(mode);
+    log() << "applying op: " << redact(op)
+          << ", oplog application mode: " << OplogApplication::modeToString(mode);
 
     // Choose opCounters based on running on standalone/primary or secondary by checking
     // whether writes are replicated. Atomic applyOps command is an exception, which runs
@@ -1863,9 +1863,9 @@ Status applyCommand_inlock(OperationContext* opCtx,
     // We should only have a stableTimestampForRecovery during replication recovery.
     invariant(stableTimestampForRecovery == boost::none ||
               mode == OplogApplication::Mode::kRecovering);
-    LOG(3) << "applying command op: " << redact(op)
-           << ", oplog application mode: " << OplogApplication::modeToString(mode)
-           << ", stable timestamp for recovery: " << stableTimestampForRecovery;
+    log() << "applying command op: " << redact(op)
+          << ", oplog application mode: " << OplogApplication::modeToString(mode)
+          << ", stable timestamp for recovery: " << stableTimestampForRecovery;
 
     std::array<StringData, 4> names = {"o", "ui", "ns", "op"};
     std::array<BSONElement, 4> fields;

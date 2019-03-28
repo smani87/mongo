@@ -96,6 +96,7 @@ void BSONObj::_assertInvalid(int maxSize) const {
         ss << " First element: " << e.toString();
     } catch (...) {
     }
+    //invariant(0);
     massert(ErrorCodes::BSONObjectTooLarge, ss.str(), 0);
 }
 

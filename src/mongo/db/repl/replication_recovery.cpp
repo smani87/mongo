@@ -66,11 +66,11 @@ class RecoveryOplogApplierStats : public OplogApplier::Observer {
 public:
     void onBatchBegin(const OplogApplier::Operations& batch) final {
         _numBatches++;
-        LOG_FOR_RECOVERY(kRecoveryBatchLogLevel)
-            << "Applying operations in batch: " << _numBatches << "(" << batch.size()
-            << " operations from " << batch.front().getOpTime() << " (inclusive) to "
-            << batch.back().getOpTime()
-            << " (inclusive)). Operations applied so far: " << _numOpsApplied;
+        // LOG_FOR_RECOVERY(kRecoveryBatchLogLevel)
+        log() << "Applying operations in batch: " << _numBatches << "(" << batch.size()
+              << " operations from " << batch.front().getOpTime() << " (inclusive) to "
+              << batch.back().getOpTime()
+              << " (inclusive)). Operations applied so far: " << _numOpsApplied;
 
         _numOpsApplied += batch.size();
         if (shouldLog(::mongo::logger::LogComponent::kStorageRecovery,

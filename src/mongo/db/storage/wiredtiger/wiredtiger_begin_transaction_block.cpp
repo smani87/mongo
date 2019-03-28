@@ -40,11 +40,29 @@
 
 namespace mongo {
 
-WiredTigerBeginTxnBlock::WiredTigerBeginTxnBlock(WT_SESSION* session, IgnorePrepared ignorePrepare)
+WiredTigerBeginTxnBlock::WiredTigerBeginTxnBlock(
+    WT_SESSION* session,
+    IgnorePrepared ignorePrepare,
+    RoundUpPreparedTimestamps roundUpPreparedTimestamps)
     : _session(session) {
     invariant(!_rollback);
-    invariantWTOK(_session->begin_transaction(
-        _session, (ignorePrepare == IgnorePrepared::kIgnore) ? "ignore_prepare=true" : nullptr));
+    char beginTxnConfigString["ignore_prepare=,roundup_timestamps=(prepared=)"_sd.size() +
+                              (2 * 5) /* 2 boolean values true/false */ + 1 /* trailing null */];
+    auto size = std::snprintf(
+        beginTxnConfigString,
+        sizeof(beginTxnConfigString),
+        "ignore_prepare=%s,roundup_timestamps=(prepared=%s)",
+        (ignorePrepare == IgnorePrepared::kIgnore) ? "true" : "false",
+        (roundUpPreparedTimestamps == RoundUpPreparedTimestamps::kRound) ? "true" : "false");
+
+    if (size < 0) {
+        int e = errno;
+        error() << "error snprintf " << errnoWithDescription(e);
+        fassertFailedNoTrace(51122);
+    }
+    invariant(static_cast<std::size_t>(size) < sizeof(beginTxnConfigString));
+
+    invariantWTOK(_session->begin_transaction(_session, beginTxnConfigString));
     _rollback = true;
 }
 
@@ -61,15 +79,17 @@ WiredTigerBeginTxnBlock::~WiredTigerBeginTxnBlock() {
     }
 }
 
-Status WiredTigerBeginTxnBlock::setTimestamp(Timestamp readTimestamp, RoundToOldest roundToOldest) {
+Status WiredTigerBeginTxnBlock::setReadSnapshot(Timestamp readTimestamp,
+                                                RoundReadUpToOldest roundReadUpToOldest) {
     invariant(_rollback);
     char readTSConfigString[15 /* read_timestamp= */ + 16 /* 16 hexadecimal digits */ +
                             17 /* ,round_to_oldest= */ + 5 /* false */ + 1 /* trailing null */];
-    auto size = std::snprintf(readTSConfigString,
-                              sizeof(readTSConfigString),
-                              "read_timestamp=%llx,round_to_oldest=%s",
-                              readTimestamp.asULL(),
-                              (roundToOldest == RoundToOldest::kRound) ? "true" : "false");
+    auto size =
+        std::snprintf(readTSConfigString,
+                      sizeof(readTSConfigString),
+                      "read_timestamp=%llx,round_to_oldest=%s",
+                      readTimestamp.asULL(),
+                      (roundReadUpToOldest == RoundReadUpToOldest::kRound) ? "true" : "false");
     if (size < 0) {
         int e = errno;
         error() << "error snprintf " << errnoWithDescription(e);

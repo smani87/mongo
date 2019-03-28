@@ -306,6 +306,7 @@ public:
 
             const Timestamp stableTimestamp = _wiredTigerKVEngine->getStableTimestamp();
             const Timestamp initialDataTimestamp = _wiredTigerKVEngine->getInitialDataTimestamp();
+            log() << "++++ checkpoint stableTimestamp " << stableTimestamp << " initialDataTimestamp " << initialDataTimestamp;
 
             // The amount of oplog to keep is primarily dictated by a user setting. However, in
             // unexpected cases, durable, recover to a timestamp storage engines may need to play
@@ -341,12 +342,14 @@ public:
                     UniqueWiredTigerSession session = _sessionCache->getSession();
                     WT_SESSION* s = session->getSession();
                     invariantWTOK(s->checkpoint(s, "use_timestamp=false"));
+                    log() << "++++++ use_timestamp=false";
                 } else if (stableTimestamp < initialDataTimestamp) {
                     LOG_FOR_RECOVERY(2)
                         << "Stable timestamp is behind the initial data timestamp, skipping "
                            "a checkpoint. StableTimestamp: "
                         << stableTimestamp.toString()
                         << " InitialDataTimestamp: " << initialDataTimestamp.toString();
+                    log() << "++++++ no checkpoint";
                 } else {
                     auto oplogNeededForRollback = _wiredTigerKVEngine->getOplogNeededForRollback();
 
@@ -357,6 +360,7 @@ public:
                     UniqueWiredTigerSession session = _sessionCache->getSession();
                     WT_SESSION* s = session->getSession();
                     invariantWTOK(s->checkpoint(s, "use_timestamp=true"));
+                    log() << "++++++ use_timestamp=true";
 
                     if (oplogNeededForRollback.isOK()) {
                         // Now that the checkpoint is durable, publish the oplog needed to recover
@@ -1552,6 +1556,7 @@ bool WiredTigerKVEngine::initRsOplogBackgroundThread(StringData ns) {
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(WTPreserveSnapshotHistoryIndefinitely);
+MONGO_FAIL_POINT_DEFINE(WTSetOldestTSToStableTS);
 
 }  // namespace
 
@@ -1602,6 +1607,7 @@ void WiredTigerKVEngine::setStableTimestamp(Timestamp stableTimestamp, bool forc
     }
     invariant(static_cast<std::size_t>(size) < sizeof(stableTSConfigString));
     invariantWTOK(_conn->set_timestamp(_conn, stableTSConfigString));
+    log() << "+++++ setting stable ts " << stableTimestamp;
 
     // After publishing a stable timestamp to WT, we can record the updated stable timestamp value
     // for the necessary oplog to keep.
@@ -1623,6 +1629,13 @@ void WiredTigerKVEngine::setStableTimestamp(Timestamp stableTimestamp, bool forc
 
 void WiredTigerKVEngine::setOldestTimestampFromStable() {
     Timestamp stableTimestamp(_stableTimestamp.load());
+
+    // Set the oldest timestamp to the stable timestamp to ensure that there is no lag window
+    // between the two.
+    if (MONGO_FAIL_POINT(WTSetOldestTSToStableTS)) {
+        setOldestTimestamp(stableTimestamp, false);
+        return;
+    }
 
     // Calculate what the oldest_timestamp should be from the stable_timestamp. The oldest
     // timestamp should lag behind stable by 'targetSnapshotHistoryWindowInSeconds' to create a

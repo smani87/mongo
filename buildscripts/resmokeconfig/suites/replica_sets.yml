@@ -2,7 +2,7 @@ test_kind: js_test
 
 selector:
   roots:
-  - jstests/replsets/*.js
+  - jstests/replsets/commit_transaction_rollback_recovery_data_already_applied.js
 
 executor:
   config:

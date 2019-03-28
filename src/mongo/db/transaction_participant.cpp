@@ -1226,9 +1226,13 @@ void TransactionParticipant::Participant::commitPreparedTransaction(
         // which will only be set if we are primary. Otherwise, the commitOplogEntryOpTime must have
         // been passed in during secondary oplog application.
         auto commitOplogSlotOpTime = commitOplogEntryOpTime.value_or(commitOplogSlot.opTime);
+        log() << "++++++ setDurableTimestamp during secondary/primary "
+              << commitOplogSlotOpTime.getTimestamp() << " commit " << commitTimestamp;
         opCtx->recoveryUnit()->setDurableTimestamp(commitOplogSlotOpTime.getTimestamp());
 
         _commitStorageTransaction(opCtx);
+
+        log() << "+++++ I am commiting the storage";
 
         auto opObserver = opCtx->getServiceContext()->getOpObserver();
         invariant(opObserver);
@@ -1236,6 +1240,7 @@ void TransactionParticipant::Participant::commitPreparedTransaction(
         // Once the transaction is committed, the oplog entry must be written.
         opObserver->onPreparedTransactionCommit(
             opCtx, commitOplogSlot, commitTimestamp, retrieveCompletedTransactionOperations(opCtx));
+        log() << "++++ oplog for commit written";
 
         clearOperationsInMemory(opCtx);
 

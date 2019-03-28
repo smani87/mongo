@@ -138,7 +138,7 @@ function RollbackTest(name = "RollbackTest", replSet, expectPreparedTxnsDuringRo
         }
 
         let replSet = new ReplSetTest({name, nodes: 3, useBridge: true, nodeOptions: nodeOptions});
-        replSet.startSet();
+        replSet.startSet({wiredTigerCacheSizeGB: 1});
 
         let config = replSet.getReplSetConfig();
         config.members[2].priority = 0;

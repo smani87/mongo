@@ -97,8 +97,13 @@ __txn_abort_newer_update(WT_SESSION_IMPL *session,
     WT_UPDATE *first_upd, wt_timestamp_t rollback_timestamp)
 {
 	WT_UPDATE *upd;
+    char ts_string[WT_TS_INT_STRING_SIZE];
+
+    __wt_timestamp_to_string(rollback_timestamp, ts_string);
+    printf("+++ Rollback timestamp %s \n", ts_string); 
 
 	for (upd = first_upd; upd != NULL; upd = upd->next) {
+        printf("++++ TXN id starting %lu \n", upd->txnid);
 		/*
 		 * Updates with no timestamp will have a timestamp of zero and
 		 * will never be rolled back.  If the table is configured for
@@ -107,9 +112,12 @@ __txn_abort_newer_update(WT_SESSION_IMPL *session,
 		 */
 		if (upd->txnid == WT_TXN_ABORTED ||
 		    upd->start_ts == WT_TS_NONE) {
+			printf("+++ txn aborted \n");
 			if (upd == first_upd)
 				first_upd = upd->next;
 		} else if (rollback_timestamp < upd->durable_ts) {
+			__wt_timestamp_to_string(upd->durable_ts, ts_string);
+        	printf("+++ durable timestamp rolled %s \n", ts_string);
 			/*
 			 * If any updates are aborted, all newer updates
 			 * better be aborted as well.
@@ -129,6 +137,9 @@ __txn_abort_newer_update(WT_SESSION_IMPL *session,
 			WT_STAT_CONN_INCR(session, txn_rollback_upd_aborted);
 			upd->durable_ts = 0;
 			upd->start_ts = 0;
+		} else {
+			__wt_timestamp_to_string(upd->durable_ts, ts_string);
+        	printf("+++ durable timestamp  not rolled %s \n", ts_string);
 		}
 	}
 }
@@ -260,10 +271,14 @@ __txn_abort_newer_updates(
 		local_read = true;
 	}
 
+    char ts_string[WT_TS_INT_STRING_SIZE];
 	/* Review deleted page saved to the ref */
 	if (ref->page_del != NULL &&
-	    rollback_timestamp < ref->page_del->durable_timestamp)
+	    rollback_timestamp < ref->page_del->durable_timestamp){
+        __wt_timestamp_to_string(ref->page_del->durable_timestamp, ts_string);
+        printf("+++ cache page del  %s %lu \n", ts_string, ref->page_del->txnid);
 		WT_ERR(__wt_delete_page_rollback(session, ref));
+    }
 
 	/*
 	 * If we have a ref with no page, or the page is clean, there is
